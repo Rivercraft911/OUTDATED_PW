@@ -39,6 +39,9 @@ function initMainSite() {
 
     // Add radar coordinate tracking
     initCoordinateTracking();
+    
+    // Enhance radar visuals with dynamic contacts
+    initRadarEffects();
 
     // Initialize contact form functionality
     initContactForm();
@@ -72,6 +75,7 @@ async function runStartupSequence() {
     const canvas = document.getElementById('startup-oscilloscope');
     const startupLog = document.getElementById('startup-log');
     const startupWelcome = document.getElementById('startup-welcome');
+    const greetingAudio = document.getElementById('greeting-audio');
 
     if (!startupScreen || !canvas || !startupLog || !startupWelcome) {
         document.body.classList.remove('startup-active');
@@ -79,10 +83,14 @@ async function runStartupSequence() {
     }
 
     document.body.classList.add('startup-active');
+    startupLog.innerHTML = '';
+    startupWelcome.classList.remove('visible');
 
     let rafId = null;
     let running = true;
     let skipRequested = false;
+    let startupSoundPlayed = false;
+    let traceSamples = [];
 
     const skipHandler = (event) => {
         if (event.key === 'Escape') {
@@ -99,10 +107,15 @@ async function runStartupSequence() {
         canvas.width = Math.max(1, Math.floor(rect.width * dpr));
         canvas.height = Math.max(1, Math.floor(rect.height * dpr));
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        traceSamples = buildAccessGrantedVectorTrace(canvas.clientWidth, canvas.clientHeight, 2200);
     };
 
     configureCanvas();
     window.addEventListener('resize', configureCanvas);
+
+    const stageWaveEnd = 4200;
+    const stageMorphEnd = 10800;
+    const stageHoldEnd = 14300;
 
     const startTime = performance.now();
     const draw = (timestamp) => {
@@ -111,54 +124,49 @@ async function runStartupSequence() {
         const elapsed = timestamp - startTime;
         const width = canvas.clientWidth;
         const height = canvas.clientHeight;
-        const midline = height / 2;
-        const revealProgress = Math.min(1, elapsed / 1800);
-        const visibleWidth = Math.max(8, width * revealProgress);
 
-        ctx.clearRect(0, 0, width, height);
+        drawScopeGrid(ctx, width, height);
 
-        ctx.strokeStyle = 'rgba(0, 80, 0, 0.5)';
-        ctx.lineWidth = 1;
-        for (let x = 0; x <= width; x += 40) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
+        let morphProgress = 0;
+        if (elapsed >= stageWaveEnd) {
+            morphProgress = easeInOutCubic(clamp01((elapsed - stageWaveEnd) / (stageMorphEnd - stageWaveEnd)));
         }
-        for (let y = 0; y <= height; y += 28) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
-            ctx.stroke();
-        }
+
+        const revealProgress = clamp01(elapsed / (stageMorphEnd - 450));
+
+        const beamHead = drawMorphingBeam(ctx, traceSamples, width, height, elapsed, revealProgress, morphProgress);
 
         ctx.beginPath();
-        for (let x = 0; x <= visibleWidth; x += 2) {
-            const baseWave = Math.sin((x * 0.03) + (elapsed * 0.012));
-            const harmonic = Math.sin((x * 0.12) - (elapsed * 0.016)) * 0.25;
-            const pulse = Math.sin((x * 0.007) + (elapsed * 0.003)) * 0.5;
-            const amplitude = 30 + (14 * pulse);
-            const y = midline + (baseWave + harmonic) * amplitude;
-            if (x === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
+        ctx.fillStyle = 'rgba(140, 255, 140, 0.94)';
+        ctx.arc(beamHead.x, beamHead.y, 2.9, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (revealProgress < 1) {
+            const revealX = width * revealProgress;
+            ctx.strokeStyle = 'rgba(40, 255, 40, 0.28)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(revealX, 0);
+            ctx.lineTo(revealX, height);
+            ctx.stroke();
+        }
+
+        if (morphProgress > 0.88) {
+            startupWelcome.classList.add('visible');
+        }
+
+        if (!startupSoundPlayed && morphProgress > 0.985 && greetingAudio) {
+            startupSoundPlayed = true;
+            greetingAudio.dataset.startupPlayed = '1';
+            greetingAudio.currentTime = 0;
+            greetingAudio.volume = 0.5;
+            const startupPlay = greetingAudio.play();
+            if (startupPlay && typeof startupPlay.catch === 'function') {
+                startupPlay.catch((error) => {
+                    console.log("Startup audio blocked by browser:", error);
+                });
             }
         }
-
-        ctx.strokeStyle = 'rgba(40, 255, 40, 0.95)';
-        ctx.lineWidth = 2;
-        ctx.shadowColor = 'rgba(40, 255, 40, 0.9)';
-        ctx.shadowBlur = 12;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        ctx.strokeStyle = 'rgba(40, 255, 40, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(visibleWidth, 0);
-        ctx.lineTo(visibleWidth, height);
-        ctx.stroke();
 
         rafId = requestAnimationFrame(draw);
     };
@@ -177,27 +185,33 @@ async function runStartupSequence() {
                 return;
             }
             line.textContent += text.charAt(i);
-            await wait(20);
+            await wait(24);
         }
     };
 
-    await wait(900);
+    await wait(950);
 
     const lines = [
         '[BOOT] calibrating oscilloscope channel...',
         '[NET] initializing secure connection...',
         '[NET] establishing encrypted route...',
-        '[SYNC] signal lock achieved.'
+        '[AUTH] access granted.'
     ];
 
     for (const line of lines) {
         if (skipRequested) break;
         await typeLine(line);
-        await wait(180);
+        await wait(260);
     }
 
     startupWelcome.classList.add('visible');
-    await wait(skipRequested ? 180 : 1100);
+    if (!skipRequested) {
+        const remainingTime = stageHoldEnd - (performance.now() - startTime);
+        if (remainingTime > 0) {
+            await wait(remainingTime);
+        }
+    }
+    await wait(skipRequested ? 240 : 960);
 
     running = false;
     if (rafId) cancelAnimationFrame(rafId);
@@ -206,6 +220,400 @@ async function runStartupSequence() {
 
     startupScreen.classList.add('hidden');
     document.body.classList.remove('startup-active');
+}
+
+function drawScopeGrid(ctx, width, height) {
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(0, 80, 0, 0.5)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+    }
+    for (let y = 0; y <= height; y += 28) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+    }
+}
+
+function drawMorphingBeam(ctx, traceSamples, width, height, elapsed, revealProgress, morphProgress) {
+    const midline = height / 2;
+    const sampleCount = traceSamples.length || 1600;
+    const safeMaxIndex = Math.max(1, sampleCount - 1);
+    const maxIndex = Math.max(2, Math.floor(safeMaxIndex * clamp01(revealProgress)));
+    const waveAmplitudeScale = lerp(1, 0.18, morphProgress);
+    const rippleAmplitude = Math.pow(1 - morphProgress, 1.25) * Math.min(height * 0.1, 24);
+    let head = { x: 0, y: midline };
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= maxIndex; i++) {
+        const p = i / safeMaxIndex;
+        const wavePoint = getSineSignalPoint(p, elapsed, width, midline, height, waveAmplitudeScale);
+        const targetPoint = traceSamples[i] || wavePoint;
+
+        let x = lerp(wavePoint.x, targetPoint.x, morphProgress);
+        let y = lerp(wavePoint.y, targetPoint.y, morphProgress);
+
+        const prevTarget = traceSamples[Math.max(0, i - 1)] || targetPoint;
+        const nextTarget = traceSamples[Math.min(safeMaxIndex, i + 1)] || targetPoint;
+        const tangentX = nextTarget.x - prevTarget.x;
+        const tangentY = nextTarget.y - prevTarget.y;
+        const tangentLength = Math.hypot(tangentX, tangentY) || 1;
+        const targetNormalX = -tangentY / tangentLength;
+        const targetNormalY = tangentX / tangentLength;
+
+        let normalX = lerp(0, targetNormalX, morphProgress * 0.92);
+        let normalY = lerp(1, targetNormalY, morphProgress * 0.92);
+        const normalLength = Math.hypot(normalX, normalY) || 1;
+        normalX /= normalLength;
+        normalY /= normalLength;
+
+        const phase = (elapsed * 0.016) + (p * 170);
+        const ripple = Math.sin(phase) + (Math.sin((phase * 0.43) + (p * 34)) * 0.45);
+        const edgeEnvelope = Math.pow(Math.sin(Math.PI * p), 0.45);
+        const offset = ripple * rippleAmplitude * edgeEnvelope;
+
+        x += normalX * offset * 0.42;
+        y += normalY * offset;
+
+        const shimmer = Math.sin((elapsed * 0.035) + (p * 930)) * Math.pow(1 - morphProgress, 2.2) * 0.75;
+        y += shimmer;
+
+        x = Math.min(width - 8, Math.max(8, x));
+        y = Math.min(height - 8, Math.max(8, y));
+
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+
+        head = { x, y };
+    }
+
+    ctx.strokeStyle = 'rgba(40, 255, 40, 0.2)';
+    ctx.lineWidth = 5.6;
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(112, 255, 112, 0.97)';
+    ctx.lineWidth = 2.1;
+    ctx.shadowColor = 'rgba(50, 255, 50, 0.9)';
+    ctx.shadowBlur = 14;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    return head;
+}
+
+function buildAccessGrantedVectorTrace(width, height, sampleCount = 2200) {
+    const text = 'ACCESS GRANTED';
+    const horizontalMargin = Math.max(26, width * 0.05);
+    const verticalMargin = Math.max(18, height * 0.12);
+    const edgePad = 12;
+
+    let charHeight = Math.min(height * 0.58, height - (verticalMargin * 2));
+    let charWidth = charHeight * 0.56;
+    let charSpacing = charWidth * 0.22;
+    let wordSpacing = charWidth * 0.92;
+
+    const availableWidth = Math.max(80, width - (horizontalMargin * 2));
+    let totalWidth = measureSignalTextWidth(text, charWidth, charSpacing, wordSpacing);
+    if (totalWidth > availableWidth) {
+        const fitScale = availableWidth / totalWidth;
+        charHeight *= fitScale;
+        charWidth *= fitScale;
+        charSpacing *= fitScale;
+        wordSpacing *= fitScale;
+        totalWidth = measureSignalTextWidth(text, charWidth, charSpacing, wordSpacing);
+    }
+
+    const topY = ((height - charHeight) / 2) + (charHeight * 0.04);
+    const baselineY = topY + (charHeight * 0.9);
+
+    let cursorX = (width - totalWidth) / 2;
+    const rawPath = [];
+    let current = {
+        x: Math.max(edgePad, cursorX - (charWidth * 0.28)),
+        y: baselineY
+    };
+    rawPath.push({ x: current.x, y: current.y });
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text.charAt(i);
+        if (char === ' ') {
+            const spaceTarget = {
+                x: cursorX + (wordSpacing * 0.68),
+                y: baselineY
+            };
+            appendCarrierBridge(rawPath, current, spaceTarget, charHeight * 0.05, 2.4, i * 0.35);
+            current = spaceTarget;
+            cursorX += wordSpacing;
+            continue;
+        }
+
+        const glyph = getSignalGlyph(char);
+        if (glyph.length > 1) {
+            const absoluteGlyph = glyph.map((point) => ({
+                x: cursorX + (point.x * charWidth),
+                y: topY + (point.y * charHeight)
+            }));
+
+            appendCarrierBridge(rawPath, current, absoluteGlyph[0], charHeight * 0.045, 2.2, i * 0.43);
+            appendSegmentedPath(rawPath, absoluteGlyph, 1.65);
+            current = rawPath[rawPath.length - 1];
+        }
+
+        cursorX += charWidth + charSpacing;
+
+        const nextChar = text.charAt(i + 1);
+        if (nextChar && nextChar !== ' ') {
+            const bridgeTarget = { x: cursorX, y: baselineY };
+            appendCarrierBridge(rawPath, current, bridgeTarget, charHeight * 0.04, 2.2, (i + 1) * 0.39);
+            current = bridgeTarget;
+        }
+    }
+
+    const tailTarget = {
+        x: Math.min(width - edgePad, current.x + (charWidth * 0.42)),
+        y: baselineY
+    };
+    appendCarrierBridge(rawPath, current, tailTarget, charHeight * 0.025, 2.6, 2.1);
+
+    const smoothedPath = smoothContinuousPath(rawPath, 2);
+    const boundedPath = smoothedPath.map((point) => ({
+        x: Math.min(width - edgePad, Math.max(edgePad, point.x)),
+        y: Math.min(height - edgePad, Math.max(edgePad, point.y))
+    }));
+
+    return resampleContinuousPath(boundedPath, sampleCount);
+}
+
+function measureSignalTextWidth(text, charWidth, charSpacing, wordSpacing) {
+    let totalWidth = 0;
+    for (let i = 0; i < text.length; i++) {
+        const char = text.charAt(i);
+        if (char === ' ') {
+            totalWidth += wordSpacing;
+            continue;
+        }
+        totalWidth += charWidth;
+        if (i < text.length - 1 && text.charAt(i + 1) !== ' ') {
+            totalWidth += charSpacing;
+        }
+    }
+    return totalWidth;
+}
+
+function getSignalGlyph(letter) {
+    const glyphs = {
+        A: [
+            { x: 0.05, y: 0.92 }, { x: 0.34, y: 0.12 }, { x: 0.52, y: 0.12 },
+            { x: 0.86, y: 0.92 }, { x: 0.72, y: 0.58 }, { x: 0.30, y: 0.58 },
+            { x: 0.66, y: 0.58 }, { x: 0.90, y: 0.92 }
+        ],
+        C: [
+            { x: 0.90, y: 0.26 }, { x: 0.78, y: 0.12 }, { x: 0.30, y: 0.08 },
+            { x: 0.12, y: 0.28 }, { x: 0.10, y: 0.50 }, { x: 0.12, y: 0.74 },
+            { x: 0.30, y: 0.92 }, { x: 0.78, y: 0.88 }, { x: 0.90, y: 0.74 }
+        ],
+        E: [
+            { x: 0.90, y: 0.12 }, { x: 0.16, y: 0.12 }, { x: 0.16, y: 0.52 },
+            { x: 0.72, y: 0.52 }, { x: 0.16, y: 0.52 }, { x: 0.16, y: 0.92 },
+            { x: 0.90, y: 0.92 }
+        ],
+        S: [
+            { x: 0.90, y: 0.20 }, { x: 0.72, y: 0.10 }, { x: 0.30, y: 0.10 },
+            { x: 0.14, y: 0.26 }, { x: 0.24, y: 0.44 }, { x: 0.74, y: 0.56 },
+            { x: 0.88, y: 0.72 }, { x: 0.74, y: 0.90 }, { x: 0.28, y: 0.90 },
+            { x: 0.10, y: 0.78 }
+        ],
+        G: [
+            { x: 0.90, y: 0.26 }, { x: 0.78, y: 0.12 }, { x: 0.30, y: 0.08 },
+            { x: 0.12, y: 0.28 }, { x: 0.10, y: 0.50 }, { x: 0.12, y: 0.74 },
+            { x: 0.30, y: 0.92 }, { x: 0.78, y: 0.88 }, { x: 0.90, y: 0.70 },
+            { x: 0.58, y: 0.70 }, { x: 0.88, y: 0.70 }, { x: 0.88, y: 0.88 }
+        ],
+        R: [
+            { x: 0.14, y: 0.92 }, { x: 0.14, y: 0.10 }, { x: 0.56, y: 0.10 },
+            { x: 0.82, y: 0.30 }, { x: 0.58, y: 0.52 }, { x: 0.14, y: 0.52 },
+            { x: 0.86, y: 0.92 }
+        ],
+        N: [
+            { x: 0.14, y: 0.92 }, { x: 0.14, y: 0.10 }, { x: 0.86, y: 0.92 },
+            { x: 0.86, y: 0.10 }
+        ],
+        T: [
+            { x: 0.08, y: 0.10 }, { x: 0.92, y: 0.10 }, { x: 0.50, y: 0.10 },
+            { x: 0.50, y: 0.92 }
+        ],
+        D: [
+            { x: 0.14, y: 0.92 }, { x: 0.14, y: 0.10 }, { x: 0.54, y: 0.10 },
+            { x: 0.86, y: 0.34 }, { x: 0.86, y: 0.68 }, { x: 0.54, y: 0.92 },
+            { x: 0.14, y: 0.92 }
+        ]
+    };
+
+    return glyphs[letter.toUpperCase()] || [];
+}
+
+function appendSegmentedPath(path, points, stepPx) {
+    if (!points || points.length < 2) return;
+
+    if (path.length === 0) {
+        path.push({ x: points[0].x, y: points[0].y });
+    } else {
+        const last = path[path.length - 1];
+        if (Math.hypot(last.x - points[0].x, last.y - points[0].y) > 0.6) {
+            appendLinearSegment(path, last, points[0], Math.max(stepPx, 1.4));
+        }
+    }
+
+    for (let i = 0; i < points.length - 1; i++) {
+        appendLinearSegment(path, points[i], points[i + 1], stepPx);
+    }
+}
+
+function appendCarrierBridge(path, start, end, amplitudePx = 6.5, stepPx = 2.2, phase = 0) {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 0.001) return;
+
+    const tangentX = dx / distance;
+    const tangentY = dy / distance;
+    const normalX = -tangentY;
+    const normalY = tangentX;
+    const cycles = Math.max(0.75, distance / 52);
+    const steps = Math.max(2, Math.ceil(distance / stepPx));
+
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const travelX = lerp(start.x, end.x, t);
+        const travelY = lerp(start.y, end.y, t);
+        const envelope = Math.sin(Math.PI * t);
+        const wave = Math.sin((t * Math.PI * 2 * cycles) + phase) * amplitudePx * envelope;
+
+        path.push({
+            x: travelX + (normalX * wave),
+            y: travelY + (normalY * wave)
+        });
+    }
+}
+
+function appendLinearSegment(path, start, end, stepPx) {
+    const distance = Math.hypot(end.x - start.x, end.y - start.y);
+    const steps = Math.max(1, Math.ceil(distance / stepPx));
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        path.push({
+            x: lerp(start.x, end.x, t),
+            y: lerp(start.y, end.y, t)
+        });
+    }
+}
+
+function smoothContinuousPath(points, passes = 1) {
+    if (!points || points.length < 3 || passes < 1) {
+        return points ? points.slice() : [];
+    }
+
+    let smoothed = points.slice();
+    for (let pass = 0; pass < passes; pass++) {
+        if (smoothed.length < 3) break;
+        const next = [smoothed[0]];
+        for (let i = 0; i < smoothed.length - 1; i++) {
+            const curr = smoothed[i];
+            const following = smoothed[i + 1];
+            next.push({
+                x: (curr.x * 0.75) + (following.x * 0.25),
+                y: (curr.y * 0.75) + (following.y * 0.25)
+            });
+            next.push({
+                x: (curr.x * 0.25) + (following.x * 0.75),
+                y: (curr.y * 0.25) + (following.y * 0.75)
+            });
+        }
+        next.push(smoothed[smoothed.length - 1]);
+        smoothed = next;
+    }
+
+    return smoothed;
+}
+
+function resampleContinuousPath(points, sampleCount) {
+    if (!points || points.length < 2) {
+        return [];
+    }
+
+    const cumulative = [0];
+    for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+        cumulative.push(cumulative[i - 1] + Math.hypot(curr.x - prev.x, curr.y - prev.y));
+    }
+
+    const totalLength = cumulative[cumulative.length - 1];
+    if (totalLength === 0) {
+        return new Array(sampleCount).fill({ x: points[0].x, y: points[0].y });
+    }
+
+    const sampled = [];
+    let segIndex = 1;
+
+    for (let i = 0; i < sampleCount; i++) {
+        const targetDist = (i / (sampleCount - 1)) * totalLength;
+        while (segIndex < cumulative.length - 1 && cumulative[segIndex] < targetDist) {
+            segIndex++;
+        }
+
+        const prevDist = cumulative[segIndex - 1];
+        const nextDist = cumulative[segIndex];
+        const segSpan = Math.max(1e-6, nextDist - prevDist);
+        const localT = (targetDist - prevDist) / segSpan;
+        const prevPoint = points[segIndex - 1];
+        const nextPoint = points[segIndex];
+
+        sampled.push({
+            x: lerp(prevPoint.x, nextPoint.x, localT),
+            y: lerp(prevPoint.y, nextPoint.y, localT)
+        });
+    }
+
+    return sampled;
+}
+
+function getSineSignalPoint(progress, elapsed, width, midline, height, amplitudeScale = 1) {
+    const x = progress * width;
+    const carrier = Math.sin((progress * 13.8 * Math.PI) + (elapsed * 0.0072));
+    const harmonic = Math.sin((progress * 35 * Math.PI) - (elapsed * 0.0104)) * 0.18;
+    const modulation = Math.sin((progress * 3.1 * Math.PI) + (elapsed * 0.0015));
+    const envelope = 0.7 + (modulation * 0.3);
+    const amplitude = height * 0.19 * envelope * amplitudeScale;
+
+    return {
+        x,
+        y: midline + ((carrier * 0.86 + harmonic) * amplitude)
+    };
+}
+
+function clamp01(value) {
+    return Math.min(1, Math.max(0, value));
+}
+
+function lerp(start, end, amount) {
+    return start + ((end - start) * amount);
+}
+
+function easeInOutCubic(value) {
+    const t = clamp01(value);
+    return t < 0.5 ? 4 * t * t * t : 1 - (Math.pow(-2 * t + 2, 3) / 2);
 }
 
 // Initialize uptime counter
@@ -232,15 +640,18 @@ function initAudio() {
     
     // Auto-play greeting on page load
     if (greetingAudio) {
-        greetingAudio.volume = 0.5;
-        
-        // Try to play audio - browsers may block autoplay
-        const playPromise = greetingAudio.play();
-        
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.log("Autoplay prevented by browser: ", error);
-            });
+        const playedDuringStartup = greetingAudio.dataset.startupPlayed === '1';
+        if (!playedDuringStartup) {
+            greetingAudio.volume = 0.5;
+            
+            // Try to play audio - browsers may block autoplay
+            const playPromise = greetingAudio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.log("Autoplay prevented by browser: ", error);
+                });
+            }
         }
     }
     
@@ -317,6 +728,64 @@ function initNavigation() {
             if (!target || target.length < 2) return;
             scrollToSection(target.substring(1), event);
         });
+    });
+}
+
+function initRadarEffects() {
+    const radarContainers = document.querySelectorAll('.radar-container');
+    radarContainers.forEach((radar, index) => {
+        let contactsLayer = radar.querySelector('.radar-contacts');
+        if (!contactsLayer) {
+            contactsLayer = document.createElement('div');
+            contactsLayer.className = 'radar-contacts';
+            radar.appendChild(contactsLayer);
+        }
+
+        const anchorBlip = radar.querySelector('.radar-blip');
+        if (anchorBlip) {
+            const moveAnchorBlip = () => {
+                const radius = 18 + (Math.random() * 26);
+                const angle = Math.random() * Math.PI * 2;
+                const x = 50 + (Math.cos(angle) * radius);
+                const y = 50 + (Math.sin(angle) * radius);
+                anchorBlip.style.left = `${x}%`;
+                anchorBlip.style.top = `${y}%`;
+            };
+            moveAnchorBlip();
+            setInterval(moveAnchorBlip, 2200 + (Math.random() * 1200));
+        }
+
+        const spawnContact = () => {
+            const contact = document.createElement('span');
+            contact.className = 'radar-contact';
+
+            const radius = 12 + (Math.random() * 36);
+            const angle = Math.random() * Math.PI * 2;
+            const x = 50 + (Math.cos(angle) * radius);
+            const y = 50 + (Math.sin(angle) * radius);
+
+            contact.style.left = `${x}%`;
+            contact.style.top = `${y}%`;
+            contact.style.setProperty('--contact-size', `${2.8 + (Math.random() * 3.4)}px`);
+            contact.style.animationDuration = `${1.6 + (Math.random() * 1.8)}s`;
+            contact.style.animationDelay = `${Math.random() * 0.3}s`;
+            contactsLayer.appendChild(contact);
+
+            while (contactsLayer.children.length > 14) {
+                contactsLayer.firstElementChild.remove();
+            }
+
+            setTimeout(() => {
+                contact.remove();
+            }, 3400);
+        };
+
+        spawnContact();
+        setInterval(() => {
+            if (Math.random() > 0.18) {
+                spawnContact();
+            }
+        }, 1100 + (Math.random() * 600) + (index * 140));
     });
 }
 

@@ -280,6 +280,10 @@ header {
     height: 200px;
     z-index: 10;
     pointer-events: none;
+    border-radius: 50%;
+    overflow: hidden;
+    filter: drop-shadow(0 0 12px rgba(0, 255, 0, 0.35));
+    animation: radar-shell-pulse 3.6s infinite ease-in-out;
 }
 
 .radar-circle {
@@ -288,7 +292,10 @@ header {
     height: 100%;
     border-radius: 50%;
     border: 2px solid var(--terminal-green);
-    box-shadow: 0 0 10px var(--glow-color);
+    box-shadow: inset 0 0 18px rgba(0, 255, 0, 0.18), 0 0 12px var(--glow-color);
+    background:
+        radial-gradient(circle at center, rgba(0, 35, 0, 0.35) 0%, rgba(0, 10, 0, 0.75) 70%, rgba(0, 6, 0, 0.95) 100%),
+        repeating-radial-gradient(circle at center, rgba(40, 255, 40, 0.14) 0 1px, transparent 1px 20px);
 }
 
 .radar-circle::before {
@@ -300,19 +307,113 @@ header {
     height: 50%;
     border-radius: 50%;
     border: 1px dashed var(--terminal-green);
-    opacity: 0.5;
+    opacity: 0.42;
+}
+
+.radar-circle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(0deg, transparent 49.4%, rgba(40, 255, 40, 0.24) 50%, transparent 50.6%),
+        linear-gradient(90deg, transparent 49.4%, rgba(40, 255, 40, 0.24) 50%, transparent 50.6%);
+    opacity: 0.7;
 }
 
 .radar-line {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 50%;
+    width: 52%;
     height: 2px;
     background-color: var(--radar-green);
     transform-origin: left center;
     box-shadow: 0 0 10px var(--glow-color);
-    animation: radar-sweep 5s infinite linear;
+    animation: radar-sweep 4.4s infinite linear;
+}
+
+.radar-line::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: -68px;
+    width: 114px;
+    height: 136px;
+    background: linear-gradient(90deg, rgba(40, 255, 40, 0.34), rgba(40, 255, 40, 0));
+    clip-path: polygon(0 50%, 100% 0, 100% 100%);
+    opacity: 0.85;
+}
+
+.radar-line::after {
+    content: "";
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(120, 255, 120, 0.9);
+    transform: translateY(-50%);
+    box-shadow: 0 0 10px rgba(120, 255, 120, 0.8);
+}
+
+.radar-blip {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: rgba(120, 255, 120, 0.95);
+    box-shadow: 0 0 8px rgba(120, 255, 120, 0.9);
+    transform: translate(-50%, -50%);
+    animation: radar-anchor-blink 1.8s infinite steps(2, end);
+}
+
+.radar-contacts {
+    position: absolute;
+    inset: 0;
+}
+
+.radar-contact {
+    --contact-size: 4px;
+    position: absolute;
+    width: var(--contact-size);
+    height: var(--contact-size);
+    margin-left: calc(var(--contact-size) / -2);
+    margin-top: calc(var(--contact-size) / -2);
+    border-radius: 50%;
+    background: rgba(120, 255, 120, 0.92);
+    box-shadow: 0 0 7px rgba(120, 255, 120, 0.88);
+    animation: radar-contact-fade 2.2s ease-out forwards;
+}
+
+.radar-contact::before {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border: 1px solid rgba(100, 255, 100, 0.6);
+    border-radius: 50%;
+    animation: radar-contact-ring 1.2s ease-out forwards;
+}
+
+@keyframes radar-shell-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+@keyframes radar-contact-fade {
+    0% { opacity: 0; transform: scale(0.65); }
+    15% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.25); }
+}
+
+@keyframes radar-contact-ring {
+    0% { opacity: 0.8; transform: scale(0.65); }
+    100% { opacity: 0; transform: scale(1.7); }
+}
+
+@keyframes radar-anchor-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
 }
 
 @keyframes radar-sweep {
