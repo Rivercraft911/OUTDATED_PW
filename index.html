@@ -11,7 +11,18 @@
     <!-- Load Howler.js for audio support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
 </head>
-<body class="loaded">
+<body class="loaded startup-active">
+    <div id="startup-screen" class="startup-screen" role="dialog" aria-live="polite" aria-label="Startup sequence">
+        <div class="startup-panel">
+            <div class="startup-header">
+                <span>BOOTSTRAP SIGNAL LINK</span>
+                <span class="startup-header-right">ESC TO SKIP</span>
+            </div>
+            <canvas id="startup-oscilloscope" width="960" height="320"></canvas>
+            <div id="startup-log" class="startup-log"></div>
+            <div id="startup-welcome" class="startup-welcome">WELCOME...</div>
+        </div>
+    </div>
     <!-- Background elements -->
     <div class="noise"></div>
     <div class="gradient-bg"></div>
@@ -56,12 +67,15 @@
     
     <div class="nav-container">
         <nav>
-            <a href="#about" class="nav-link" onclick="scrollToSection('about'); return false;">About</a>
-            <a href="#education" class="nav-link" onclick="scrollToSection('education'); return false;">Education</a>
-            <a href="#projects" class="nav-link" onclick="scrollToSection('projects'); return false;">Projects</a>
-            <a href="#skills" class="nav-link" onclick="scrollToSection('skills'); return false;">Skills</a>
-            <a href="#contact" class="nav-link" onclick="scrollToSection('contact'); return false;">Contact</a>
+            <a href="#about" class="nav-link">About</a>
+            <a href="#education" class="nav-link">Education</a>
+            <a href="#projects" class="nav-link">Projects</a>
+            <a href="#skills" class="nav-link">Skills</a>
+            <a href="#contact" class="nav-link">Contact</a>
         </nav>
+        <div class="command-launch-row">
+            <button id="command-palette-trigger" class="command-palette-trigger" type="button">Ctrl+K // Command Console</button>
+        </div>
     </div>
     
     <main>
@@ -132,7 +146,7 @@
                     <h4>REDSTONE COMPUTING ENGINE</h4>
                     <p>A fully functional computer built entirely within Minecraft using redstone circuits and logic gates. Currently implementing an ALU and memory management system.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">▶</span>Demo Coming Soon(I hope)</a>
+                        <a href="#" class="project-link"><span class="icon">▶</span>Demo Coming Soon(I hope)</a>
                     </div>
                 </div>
                 
@@ -141,7 +155,7 @@
                     <h4>MAGNETORQUER OPTIMIZATION TOOL</h4>
                     <p>Python tool for calculating the optimal trace width to maximize magnetic moment for PCB magnetorquer coils with various copper weights. Considers constraints like trace width, spacing, current density, and power limitations.</p>
                     <div class="project-links">
-                        <a href="https://github.com/Rivercraft911/magtorque-optimization" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="https://github.com/Rivercraft911/magtorque-optimization" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
                     </div>
                 </div>
                 
@@ -150,8 +164,8 @@
                     <h4>PROJECT SENTINAL ORIGINALLY PROJECT THEIA</h4>
                     <p>RF-based human pose estimation system now based a custom MIMO array, custom PCBs, and custom NNW. Can find human poses through walls. Started as Project Theia winning TreeHacks 2025 OpenAI Prize winner.</p>
                     <div class="project-links">
-                        <a href="https://github.com/Timothy2105/theia" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub(theia)</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">🔬</span>Research Paper(Also coming soon but this one is prob sooner)</a>
+                        <a href="https://github.com/Timothy2105/theia" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub(theia)</a>
+                        <a href="#" class="project-link"><span class="icon">🔬</span>Research Paper(Also coming soon but this one is prob sooner)</a>
                     </div>
                 </div>
                 
@@ -160,8 +174,8 @@
                     <h4>INFINITERECON</h4>
                     <p>Real-time audio surveillance and analytics system using ESP32-S3, enabling speech-to-text, speaker identification, and SMS notifications via cloud-based AI with web dashboard for system management.</p>
                     <div class="project-links">
-                        <a href="https://github.com/Rivercraft911/InfiniteRecon" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">▶</span>Demo</a>
+                        <a href="https://github.com/Rivercraft911/InfiniteRecon" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="#" class="project-link"><span class="icon">▶</span>Demo</a>
                     </div>
                 </div>
                 
@@ -421,11 +435,11 @@
         <!-- Contact form container -->
         <div class="contact-form">
             <div class="form-header">
-                <h4>DIRECT MESSAGE <span class="inline-warning">[OFFLINE]</span></h4>
+                <h4>DIRECT MESSAGE <span class="inline-warning">[ONLINE]</span></h4>
                 <div class="form-header-line"></div>
             </div>
             
-            <form id="contact-form">
+            <form id="contact-form" novalidate>
                 <div class="form-group">
                     <label for="name">IDENTIFY YOURSELF:</label>
                     <input type="text" id="name" name="name" required>
@@ -450,8 +464,18 @@
                     <div class="validation-message" id="message-validation"></div>
                 </div>
                 
-                <button type="submit" class="submit-btn disabled-btn" disabled>TRANSMIT</button>
-                <div class="form-note">Domain authentication required. Use channels above.(I will make it work and get a domain soon do not fret but please just email me for now)!!</div>
+                <div class="bot-field-wrap" aria-hidden="true">
+                    <label for="contact-honey">Leave this field empty</label>
+                    <input type="text" id="contact-honey" name="_honey" tabindex="-1" autocomplete="off">
+                </div>
+                <input type="hidden" id="form-started-at" name="form_started_at">
+                <input type="hidden" name="_subject" value="Portfolio Contact Transmission">
+                <input type="hidden" name="_template" value="table">
+                <input type="hidden" name="_captcha" value="false">
+                
+                <div id="form-status" class="form-status" aria-live="polite"></div>
+                <button type="submit" class="submit-btn">TRANSMIT</button>
+                <div class="form-note">Rate limit active: max 4 transmissions/hour per browser session.</div>
             </form>
             
             <div class="form-success">
@@ -468,6 +492,18 @@
         </div>
     </div>
 </section>
+
+    <div id="command-palette" class="command-palette" hidden>
+        <div class="command-palette-backdrop" data-close-command-palette></div>
+        <div class="command-dialog" role="dialog" aria-modal="true" aria-labelledby="command-palette-title">
+            <div class="command-title-row">
+                <h4 id="command-palette-title">Command Console</h4>
+                <span>ESC TO CLOSE</span>
+            </div>
+            <input id="command-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type a command or destination...">
+            <ul id="command-results" class="command-results"></ul>
+        </div>
+    </div>
     
     <footer>
         <div class="footer-grid">
@@ -509,7 +545,7 @@
         <source src="assets/audio/click.mp3" type="audio/mpeg">
     </audio>
     <audio id="success-sound" preload="auto">
-        <source src="assets/audio/success.mp3" type="audio/mpeg">
+        <source src="assets/audio/click.mp3" type="audio/mpeg">
     </audio>
     
     <!-- Scripts at the end of body -->
@@ -518,3 +554,4 @@
     <script src="js/military-effects.js"></script>
 </body>
 </html>
+

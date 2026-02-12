@@ -45,6 +45,94 @@ body.loaded {
     opacity: 1;
 }
 
+body.startup-active {
+    overflow: hidden;
+}
+
+body.command-palette-open {
+    overflow: hidden;
+}
+
+.startup-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+        radial-gradient(circle at center, rgba(0, 48, 0, 0.35) 0%, rgba(0, 8, 0, 0.95) 65%),
+        linear-gradient(180deg, rgba(0, 24, 0, 0.6), rgba(0, 6, 0, 0.95));
+    transition: opacity 0.7s ease, visibility 0.7s ease;
+}
+
+.startup-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.startup-panel {
+    width: min(980px, 92vw);
+    border: 1px solid var(--terminal-green-dark);
+    background: rgba(0, 8, 0, 0.72);
+    box-shadow: 0 0 28px rgba(0, 255, 0, 0.2);
+    padding: 16px;
+}
+
+.startup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    color: var(--terminal-green-light);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.startup-header-right {
+    opacity: 0.8;
+}
+
+#startup-oscilloscope {
+    width: 100%;
+    height: clamp(220px, 32vh, 320px);
+    display: block;
+    border: 1px solid rgba(0, 255, 0, 0.25);
+    background-color: rgba(0, 6, 0, 0.95);
+}
+
+.startup-log {
+    min-height: 96px;
+    margin-top: 12px;
+    font-size: 0.88rem;
+    color: var(--terminal-green-light);
+}
+
+.startup-log-line {
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.startup-welcome {
+    margin-top: 8px;
+    font-size: clamp(1.2rem, 4.5vw, 2.4rem);
+    letter-spacing: 5px;
+    text-align: center;
+    color: var(--terminal-green);
+    text-shadow: 0 0 16px rgba(0, 255, 0, 0.8);
+    opacity: 0;
+    transform: scale(0.98);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.startup-welcome.visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
 body::before {
     content: "";
     position: fixed;
@@ -410,6 +498,137 @@ nav a:hover, nav a:focus, nav a.active {
 
 nav a:hover::before, nav a:focus::before {
     left: 100%;
+}
+
+.command-launch-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.command-palette-trigger {
+    border: 1px solid var(--terminal-green-dark);
+    background: rgba(0, 20, 0, 0.35);
+    color: var(--terminal-green-light);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.command-palette-trigger:hover,
+.command-palette-trigger:focus {
+    color: var(--terminal-green);
+    border-color: var(--terminal-green);
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
+    outline: none;
+}
+
+.command-palette {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: min(16vh, 140px);
+}
+
+.command-palette[hidden] {
+    display: none;
+}
+
+.command-palette-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 8, 0, 0.74);
+    backdrop-filter: blur(2px);
+}
+
+.command-dialog {
+    position: relative;
+    width: min(760px, 92vw);
+    background: rgba(2, 14, 2, 0.95);
+    border: 1px solid var(--terminal-green-dark);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 255, 0, 0.16);
+    padding: 14px;
+}
+
+.command-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+
+.command-title-row h4 {
+    color: var(--radar-green);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.95rem;
+}
+
+.command-title-row span {
+    color: var(--terminal-green-light);
+    opacity: 0.75;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+}
+
+#command-input {
+    width: 100%;
+    border: 1px solid var(--terminal-green-dark);
+    background: rgba(0, 18, 0, 0.6);
+    color: var(--terminal-green);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    padding: 12px 10px;
+    margin-bottom: 12px;
+}
+
+#command-input:focus {
+    outline: none;
+    border-color: var(--terminal-green);
+    box-shadow: 0 0 9px rgba(0, 255, 0, 0.35);
+}
+
+.command-results {
+    list-style: none;
+    display: grid;
+    gap: 8px;
+    max-height: min(48vh, 380px);
+    overflow-y: auto;
+}
+
+.command-result {
+    border: 1px solid var(--terminal-green-dark);
+    background: rgba(0, 14, 0, 0.4);
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.command-result:hover,
+.command-result.active {
+    border-color: var(--terminal-green);
+    box-shadow: inset 0 0 0 1px rgba(0, 255, 0, 0.3), 0 0 7px rgba(0, 255, 0, 0.2);
+    transform: translateX(2px);
+}
+
+.command-result-title {
+    color: var(--terminal-green);
+    font-size: 0.9rem;
+    margin-bottom: 3px;
+}
+
+.command-result-meta {
+    color: var(--terminal-green-light);
+    opacity: 0.75;
+    font-size: 0.76rem;
+    letter-spacing: 0.5px;
 }
 
 main {
@@ -1141,6 +1360,37 @@ input:focus, textarea:focus {
     height: 15px;
 }
 
+.bot-field-wrap {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.form-status {
+    min-height: 22px;
+    font-size: 0.82rem;
+    letter-spacing: 0.3px;
+}
+
+.form-status.info {
+    color: var(--terminal-green-light);
+}
+
+.form-status.error {
+    color: var(--error-red);
+}
+
+.form-status.success {
+    color: var(--success-green);
+}
+
+.typing-indicator {
+    color: var(--terminal-green-light);
+    font-size: 0.8rem;
+}
+
 .submit-btn {
     padding: 10px 20px;
     background-color: transparent;
@@ -1186,6 +1436,13 @@ input:focus, textarea:focus {
 
 .submit-btn:active {
     transform: translateY(0);
+}
+
+.submit-btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Enhanced form success message */
@@ -1547,6 +1804,10 @@ footer {
         width: 150px;
         height: 150px;
     }
+
+    .command-dialog {
+        width: min(92vw, 680px);
+    }
 }
 
 @media (max-width: 768px) {
@@ -1601,6 +1862,27 @@ footer {
         flex-direction: row;
         justify-content: center;
         flex-wrap: wrap;
+    }
+
+    .startup-panel {
+        padding: 12px;
+    }
+
+    .startup-header {
+        font-size: 0.72rem;
+    }
+
+    .command-palette {
+        padding-top: 80px;
+    }
+
+    .command-dialog {
+        width: 94vw;
+        padding: 10px;
+    }
+
+    .command-palette-trigger {
+        font-size: 0.7rem;
     }
 }
 
