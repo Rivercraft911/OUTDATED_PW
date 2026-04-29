@@ -1,8 +1,6 @@
 
 # Military-Style Terminal Portfolio
 
-![Military Terminal Portfolio Screenshot](screenshot.png)
-
 ## Overview
 
 A retro military/radar green aesthetic portfolio website designed for engineers, developers, and paradigm shifters. This project features an interactive terminal-inspired design with animated tesseract visualization, radar effects, oscilloscope waveforms, and military-style status indicators.
